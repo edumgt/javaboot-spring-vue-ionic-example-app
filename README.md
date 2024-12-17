@@ -1,3 +1,5 @@
+## npm error
+
 # Vue Ionic mobile
 
 # Backend Rest Api
