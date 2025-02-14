@@ -1,20 +1,26 @@
-import { computed, Ref, ref, watch } from 'vue';
-import { usePaging } from '@/composables/UsePaging';
-import { useSort } from '@/composables/UseSort';
-import { ICrudListApiOptions } from '@/types/Common';
-import { useAxios } from '@/composables/UseAxios';
-import { isAppException, isArray, isEmpty, isListResponse, isServerResponseMessage } from '@/utils/AppUtil';
-import { ApiListResponse } from '@/types/Models';
 
-export const usePagefecth = <T>(options: ICrudListApiOptions) => {
+/* eslint-disable ts/no-unused-vars */
+import { useAxios } from '@/composables/useAxios';
+import { usePaging } from '@/composables/usePaging';
+import { useSort } from '@/composables/useSort';
+import type { ApiListResponse, CrudListApiOptions } from '@/types/common';
+import { isAppException, isArray, isEmpty, isListResponse, isServerResponseMessage } from '@/utils/appUtil';
+import { warningOutline } from 'ionicons/icons';
+import type { Ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useBase } from './useBase';
+
+
+export const usePagefecth = <T>(options: CrudListApiOptions) => {
     const { callAxios } = useAxios();
+    const { appToast } = useBase();
     const { pages, resetPaging } = usePaging(options?.itemsPerPage ? options.itemsPerPage : 10);
-    const { sort, sortMode } = useSort(options?.defaultSort);
+    const { sort } = useSort(options?.defaultSort);
     const dataList = ref<T[]>([]) as Ref<T[]>;
     const isInfiniteDisabled = ref(false);
     const firstLoaded = ref(false);
     const loading = ref(false);
-    const urlEndpoint = ref(options.urlEndpoint);
+    const urlEndpoint = ref(options.apiEndpoint);
     const additionalUri = ref(options?.additionalUri);
 
     const queryParam = computed((): string | undefined => {
@@ -45,48 +51,89 @@ export const usePagefecth = <T>(options: ICrudListApiOptions) => {
     );
     const loadData = async () => {
         loading.value = true;
-        const response = await callAxios<ApiListResponse<T>>({
-            API: apiEndpoint.value,
-            method: 'GET'
-        });
-        if (!firstLoaded.value) {
-            firstLoaded.value = true;
-        }
-        loading.value = false;
-        if (!isAppException(response) && !isServerResponseMessage(response)) {
-            if (isListResponse(response)) {
-                if (!options.concatList) {
-                    dataList.value = response.dataList;
-                } else {
-                    dataList.value.push(...response.dataList);
-                }
-
-                if (response.totalPages != undefined) {
-                    pages.value.totalPages = response.totalPages;
-                }
-                if (response.totalElements != undefined) {
-                    pages.value.totalElements = response.totalElements;
-                    if (response.totalElements == 0 || response.totalElements < pages.value.itemsPerPage) {
-                        isInfiniteDisabled.value = true;
+        try {
+            const response = await callAxios<ApiListResponse<T>>({
+                API: apiEndpoint.value,
+                method: 'GET'
+            });
+            let list: T[] = [];
+            if (!isAppException(response) && !isServerResponseMessage(response)) {
+                if (isListResponse(response)) {
+                    if (!options.reverseList) {
+                        list = response.dataList;
+                    } else {
+                        list = response.dataList.reverse();
                     }
-                }
-                if (response.last != undefined) {
-                    pages.value.last = response.last;
-                    isInfiniteDisabled.value = response.last;
-                }
-
-            } else if (isArray(response)) {
-                if (!options.concatList) {
-                    dataList.value = response as any;
-                } else {
-                    dataList.value.push(...response as any);
+                    await setDataList(list);
+                    if (response.totalPages != undefined) {
+                        pages.value.totalPages = response.totalPages;
+                    }
+                    if (response.totalElements != undefined) {
+                        pages.value.totalElements = response.totalElements;
+                        if (response.totalElements == 0 || response.totalElements < pages.value.itemsPerPage) {
+                            isInfiniteDisabled.value = true;
+                        } else {
+                            isInfiniteDisabled.value = false;
+                        }
+                    }
+                    if (response.last != undefined) {
+                        pages.value.last = response.last;
+                        isInfiniteDisabled.value = response.last;
+                    }
+                } else if (response && isArray(response)) {
+                    const responseList: T[] = response as unknown as T[];
+                    if (responseList.length == 0 || responseList.length < pages.value.itemsPerPage) {
+                        isInfiniteDisabled.value = true;
+                    } else {
+                        isInfiniteDisabled.value = false;
+                    }
+                    if (!options.reverseList) {
+                        list = responseList;
+                    } else {
+                        list = responseList.reverse();
+                    }
+                    await setDataList(list);
                 }
             }
+        } catch (error: any) {
+            console.error('useCrudList', error);
+            if (error.message) {
+                appToast({
+                    text: error.message,
+                    icon: warningOutline,
+                    color: 'danger',
+                    time: 10*1000
+                  });
+            }
+        } finally {
+            if (!firstLoaded.value) {
+                firstLoaded.value = true;
+            }
+
+            loading.value = false;
         }
         return new Promise((resolve) => {
             resolve(true);
         });
     };
+    const setDataList = (list: T[]) => {
+        return new Promise((resolve) => {
+            if (pages.value.current == 1) {
+                dataList.value = list;
+            } else {
+                if (!options.concatList) {
+                    dataList.value = list;
+                } else {
+                    if (!options.addUnshift) {
+                        dataList.value.push(...list);
+                    } else {
+                        dataList.value.unshift(...list);
+                    }
+                }
+            }
+            resolve(true)
+        })
+    }
     const resetData = (resetPage: boolean = true) => {
         if (resetPage) {
             resetPaging();
@@ -97,48 +144,44 @@ export const usePagefecth = <T>(options: ICrudListApiOptions) => {
     };
     const onReload = async () => {
         resetPaging();
-        dataList.value = [];
-        firstLoaded.value = false;
+        if (!options.preventResetListReload) {
+            firstLoaded.value = false;
+            dataList.value = [];
+        }
         isInfiniteDisabled.value = false;
         await loadData();
-        return new Promise((resolve) => resolve(true));
+        return new Promise(resolve => resolve(true));
     };
 
     const onNextPage = async () => {
-        pages.value.current++;
-        await loadData();
-        return new Promise((resolve) => resolve(true));
+        if (firstLoaded.value) {
+            pages.value.current++;
+            await loadData();
+        }
+        return new Promise(resolve => resolve(true));
     };
 
     const loadPageChange = async (resetPage: boolean = false) => {
         resetData(resetPage);
         await loadData();
-        return new Promise((resolve) => resolve(true));
+        return new Promise(resolve => resolve(true));
     };
 
     const onPageChange = async (value: number | undefined) => {
         await loadPageChange(false);
-        return new Promise((resolve) => resolve(true));
+        return new Promise(resolve => resolve(true));
     };
 
     const onPerPageChange = async (value: number | undefined) => {
         await loadPageChange(false);
-        return new Promise((resolve) => resolve(true));
+        return new Promise(resolve => resolve(true));
     };
-    watch(sort.value, async (s) => {
-        if (s) {
-            if (firstLoaded.value) {
-                await onReload();
-            }
-        }
-    });
     return {
         isInfiniteDisabled,
         firstLoaded,
         loading,
         pages,
         sort,
-        sortMode,
         dataList,
         urlEndpoint,
         additionalUri,

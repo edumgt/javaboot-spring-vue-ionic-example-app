@@ -1,22 +1,24 @@
-import { AxiosKey } from '@/plugins/AxiosSymbols';
-import { AppException, RequestType, ResponseMessage } from '@/types/Common';
-import { isAppException, isServerException, isServerResponseMessage } from '@/utils/AppUtil';
-import { injectStrict } from '@/utils/InjectTyped';
+import { AxiosKey } from '@/plugins/axiosSymbols';
+import type { AppException, RequestType, ResponseMessage } from '@/types/common';
+import { isAppException, isServerException, isServerResponseMessage } from '@/utils/appUtil';
+import { AppAuthTokenKey } from '@/libs/constant';
+import { injectStrict } from '@/utils/injectTyped';
+import { loadStorage } from '@/utils/storageUtil';
 import { App } from '@capacitor/app';
 import { toastController } from '@ionic/vue';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { alertCircle, closeOutline, exitOutline } from 'ionicons/icons';
 import { onUnmounted, ref } from 'vue';
-import { useBase } from './UseBase';
-import { useConfig } from './UseConfig';
-import { AppAuthTokenKey, LocaleKey } from '@/utils/Constant';
-import { loadStorage } from '@/utils/StorageUtil';
+import { useBase } from './useBase';
+import { useConfig } from './useConfig';
+import { useDevice } from './useDevice';
 
 export const useAxios = () => {
   const sessionTimeOutRef = ref();
   const $appAxios = injectStrict(AxiosKey); // it's typed now
-  const { WeeToast } = useBase();
-  const { isDevMode, getConfigPublicType } = useConfig();
+  const { appToast } = useBase();
+  const { canSyncActiveStatusToServer } = useDevice();
+  const { isDevMode, getEnv } = useConfig();
   onUnmounted(() => {
     if (sessionTimeOutRef.value) {
       clearTimeout(sessionTimeOutRef.value);
@@ -38,7 +40,7 @@ export const useAxios = () => {
     });
   };
   const notifyException = (response: AppException): void => {
-    WeeToast({
+    appToast({
       text: `${response.message} : ${response.errors?.join(
         ','
       )}`,
@@ -52,7 +54,7 @@ export const useAxios = () => {
     if (!response.message) {
       return;
     }
-    WeeToast({
+    appToast({
       text: response.message,
       closeIcon: closeOutline,
       time: 3 * 1000,
@@ -62,44 +64,61 @@ export const useAxios = () => {
           : 'danger'
     });
   };
-  const callAxiosV2 = async <T>(req: RequestType): Promise<T | null> => {
-    const res = await callAxios<T>(req);
-    return await validateServerResponse<T>(res);
-  };
   const callAxiosFile = async <T>(req: RequestType): Promise<any> => {
-    return new Promise(async (resolve /*reject*/) => {
-      const response = await callAxiosProcess<T>(req, false);
+    const response = await callAxiosProcess<T>(req, false);
+    return new Promise((resolve /* reject */) => {
       resolve(response);
     });
   };
-  const callAxios = async <T>(req: RequestType): Promise<T> => {
-    return new Promise(async (resolve /*reject*/) => {
-      const response = await callAxiosProcess<T>(req);
-      if (response.status != 401 && response.status != 403) {
-        if (response.data) {
-          if (isAppException(response.data)) {
-            notifyException(response.data);
-          } else if (isServerResponseMessage(response.data)) {
-            notifyServerMessage(response.data);
+  const callAxios = async <T>(req: RequestType): Promise<T | null> => {
+    const response = await callAxiosProcess<T>(req);
+    return new Promise((resolve /* reject */) => {
+        if (response.status != 401 && response.status != 403) {
+          if (response.data) {
+            if (isAppException(response.data)) {
+              notifyException(response.data);
+            } else if (isServerResponseMessage(response.data)) {
+              notifyServerMessage(response.data);
+            }
           }
         }
+        resolve(response.data as T);
       }
-      resolve(response.data as T);
-    }
     );
+
+
+    // return new Promise(async (resolve, reject) => {
+    //   callAxiosProcess<T>(req)
+    //     .then(async (response) => {
+    //       if (response.status != 401 && response.status != 403) {
+    //         if (response.data) {
+    //           if (isAppException(response.data)) {
+    //             notifyException(response.data);
+    //           } else if (isServerResponseMessage(response.data)) {
+    //             notifyServerMessage(response.data);
+    //           }
+    //         }
+    //       }
+    //       const finalResponse = await validateServerResponse<T>(response.data);
+    //       resolve(finalResponse);
+    //     })
+    //     .catch((error) => {
+    //       reject(error);
+    //     });
+    // });
   };
-  const callAxiosProcess = <T>(req: RequestType, logDev: boolean = true): Promise<AxiosResponse<T>> => {
-    return new Promise(async (resolve /*reject*/) => {
-      const jwtKey = await loadStorage<string>(AppAuthTokenKey);
+  const callAxiosProcess = async <T>(req: RequestType, logDev: boolean = true): Promise<AxiosResponse<T>> => {
+    const jwtKey = await loadStorage<string>(AppAuthTokenKey);
+    const cahSyncOnlineStatus = await canSyncActiveStatusToServer();
+    return new Promise((resolve, reject) => {
       $appAxios.defaults.headers.Authorization = `Bearer ${jwtKey}`;
       // $appAxios.defaults.headers['Accept-Language'] = await loadStorage<string>(LocaleKey);
 
       if (req.baseURL != undefined) {
         $appAxios.defaults.baseURL = req.baseURL;
       } else {
-        $appAxios.defaults.baseURL = getConfigPublicType<string>('apiBaseUrl');
+        $appAxios.defaults.baseURL = getEnv<string>('VITE_API_BASE_URL');
       }
-
       if (req.contentType) {
         $appAxios.defaults.headers['Content-Type'] = req.contentType;
       } else {
@@ -110,7 +129,7 @@ export const useAxios = () => {
       } else {
         $appAxios.defaults.responseType = 'json';
       }
-
+      $appAxios.defaults.headers['X-Sync-Active'] = cahSyncOnlineStatus ? '1' : '0';
       $appAxios({
         method: req.method,
         url: req.API,
@@ -124,27 +143,26 @@ export const useAxios = () => {
         })
         .catch((error: any) => {
           if (isDevMode()) {
-            console.error(`api `, error.response.status);
-
             console.error(`api ${$appAxios.defaults.baseURL}${req.API}`, req, error);
           }
-          if (error?.response && error?.response?.status) {
-            if (error.response.status != 401 && error.response.status != 403) {
-              showErrorToast(error);
-            }
+          if (error?.response?.status != 401 && error?.response?.status != 403) {
+            showErrorToast(error);
           }
-          resolve(error);
+          reject(error);
         });
     });
   };
 
 
   const showErrorToast = async (error: any) => {
+    const responseData = error?.response?.data;
+    const message = responseData?.message;
+    const errors = responseData?.errors && responseData?.errors.length > 0 ? responseData?.errors.toString() : undefined;
     const toast = await toastController.create({
-      header: error.code,
-      message: error.message,
+      header: message || error.code,
+      message: errors || error.message,
       icon: alertCircle,
-      duration: 5 * 1000,
+      duration: 15 * 1000,
       mode: 'ios',
       color: 'danger',
       buttons: [
@@ -167,5 +185,5 @@ export const useAxios = () => {
     });
     await toast.present();
   };
-  return { callAxios, callAxiosV2, validateServerResponse, callAxiosFile, callAxiosProcess };
+  return { callAxios, validateServerResponse, callAxiosFile, callAxiosProcess };
 };

@@ -1,36 +1,30 @@
-import { useAuthenStore } from '@/stores/AuthenStore';
 import AuthenService from '@/api/AuthenService';
-import { RefreshTokenResponse, UserDto } from '@/types/Models';
-import { useBase } from './UseBase';
-import { useLang } from './UseLang';
-import { useCache } from './UseCache';
-import { useNotification } from './UseNotification';
-import { cordovaClearCach } from '@/utils/AppUtil';
-import {
-  saveStorage,
-  loadStorage,
-  removeStorage
-} from '@/utils/StorageUtil';
+import { useAuthenStore } from '@/stores/authenStore';
+import type { RefreshTokenResponse, UserDto } from '@/types/models';
+import { cordovaClearCach } from '@/utils/appUtil';
 import {
   AppAuthRefeshTokenKey,
   AppAuthTokenCreatedKey,
   AppAuthTokenExpireKey,
   AppAuthTokenKey
-} from '@/utils/Constant';
+} from '@/libs/constant';
+import {
+  loadStorage,
+  removeStorage,
+  saveStorage
+} from '@/utils/storageUtil';
+import { useBase } from './useBase';
+import { useCache } from './useCache';
+import { useLang } from './useLang';
+import { useNotification } from './useNotification';
 
 export const useAuthen = () => {
   const authenStore = useAuthenStore();
-  const { WeeConfirm, WeeLoading, WeeGoTo } = useBase();
+  const { appConfirm, appLoading, } = useBase();
   const { t } = useLang();
   const { logoutClear } = useCache();
   const { userUnSubscribeFcm, unregisterNotifications } = useNotification();
-  const { singoutToServer, refreshToken } = AuthenService();
-  // const {
-  //   authTokenKey,
-  //   refeshTokenKey,
-  //   authTokenExpireKey,
-  //   authTokenCreatedKey
-  // } = useCache();
+  const { singoutToServer, } = AuthenService();
 
   const setAuthen = (auth: UserDto | null) => {
     if (auth != null) {
@@ -54,9 +48,9 @@ export const useAuthen = () => {
     });
   };
   const signOut = async () => {
-    const conf = await WeeConfirm(t('app.monogram'), t('helper.logoutConfirm'));
+    const conf = await appConfirm(t('app.monogram'), t('helper.logoutConfirm'));
     if (conf) {
-      const loading: any = await WeeLoading();
+      const loading: any = await appLoading();
       loading.present();
       await unregisterNotifications();
       if (authenStore.auth?.id) {
@@ -68,7 +62,6 @@ export const useAuthen = () => {
       loading.dismiss();
       await destroyAuthDataAndRedirect();
     }
-    return;
   };
   const logoutToServer = async (
     refeshTokenKey: string | null,
@@ -83,21 +76,21 @@ export const useAuthen = () => {
     await singoutToServer({
       refreshToken: {
         refreshToken: refeshTokenKey,
-        email: mail ? mail : ''
+        email: mail || ''
       }
     });
     return new Promise((resolve) => {
       resolve(true);
     });
   };
-  const destroyAuthData = () => {
-    return new Promise(async (resolve) => {
-      await removeStorage(AppAuthTokenKey);
-      await removeStorage(AppAuthRefeshTokenKey);
-      await removeStorage(AppAuthTokenExpireKey);
-      await removeStorage(AppAuthTokenCreatedKey);
-      await cordovaClearCach();
-      await logoutClear();
+  const destroyAuthData = async () => {
+    await removeStorage(AppAuthTokenKey);
+    await removeStorage(AppAuthRefeshTokenKey);
+    await removeStorage(AppAuthTokenExpireKey);
+    await removeStorage(AppAuthTokenCreatedKey);
+    await cordovaClearCach();
+    await logoutClear();
+    return new Promise((resolve) => {
       resolve(true);
     });
   };
@@ -108,7 +101,7 @@ export const useAuthen = () => {
     authenStore.logout();
     if (forceRedirectToLoginPage) {
       window.location.replace('/auth/login');
-      // WeeGoTo('/auth/login', true);
+      // appNavigateTo('/auth/login', true);
     }
     return new Promise((resolve) => {
       resolve(true);
