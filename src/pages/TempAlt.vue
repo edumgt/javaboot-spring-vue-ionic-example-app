@@ -5,9 +5,9 @@
     :content-padding="false"
     show-back-link
   >
-    <template v-slot:actions-end>
+    <template #actions-end>
       <ion-buttons>
-        <BaseMenu :items="myMenuItems"></BaseMenu>
+        <BaseDropdownMenu :items="menus"/>
       </ion-buttons>
     </template>
     <ion-searchbar
@@ -23,14 +23,13 @@
       full-height
     >
     </base-result>
-
-  </base-layout>
+</base-layout>
 </template>
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { addOutline, funnelOutline, searchOutline } from 'ionicons/icons';
-import { useLang } from '@/composables/UseLang';
-import { useBase } from '@/composables/UseBase';
+import { useLang } from '@/composables/useLang';
+import { useBase } from '@/composables/useBase';
 import {
   IonPage,
   IonRow,
@@ -87,34 +86,35 @@ import {
   IonFab,
   IonFabButton
 } from '@ionic/vue';
-import BaseLayout from '@/components/base/Layout.vue';
-import BaseResult from '@/components/base/Result.vue';
-import BaseMenu from '@/components/base/Menu.vue';
-import { IMenuItem } from '@/types/Models';
+import BaseLayout from '@/components/base/BaseLayout.vue';
+import BaseResult from '@/components/base/BaseResult.vue';
+import BaseDropdownMenu from '@/components/base/BaseDropdownMenu.vue';
+import { biCopy, biPencil, biTrash } from '@quasar/extras/bootstrap-icons';
+import { LabelValue } from '@/types/common';
 
-const { WeeGoTo } = useBase();
+const { appNavigateTo } = useBase();
 const { t } = useLang();
-const myMenuItems: IMenuItem[] = [
+const menus = ref<LabelValue<number>[]>([
   {
-    id: 0,
-    title: 'base.search',
-    i18n: true,
-    icon: searchOutline,
-    iconType: 'ion'
+    label: 'Edit',
+    description: 'edit this item',
+    icon: biPencil,
+    fetch: false,
+    value: 1
   },
   {
-    id: 1,
-    title: 'sort.sort',
-    i18n: true,
-    icon: funnelOutline,
-    iconType: 'ion'
+    label: 'Delete',
+    icon: biTrash,
+    color: 'danger',
+    fetch: false,
+    value: 2
   },
   {
-    id: 2,
-    title: 'base.addNew',
-    i18n: true,
-    icon: addOutline,
-    iconType: 'ion'
+    label: 'Copy',
+    description: 'Copy this item',
+    icon: biCopy,
+    fetch: false,
+    value: 3
   }
-];
+]);
 </script>

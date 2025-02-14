@@ -17,7 +17,7 @@
         :pull-factor="0.5"
         :pull-min="100"
         :pull-max="200"
-        @ionRefresh="doRefresh($event)"
+        @ion-refresh="doRefresh($event)"
       >
         <ion-refresher-content class="refresher"></ion-refresher-content>
       </ion-refresher>
@@ -38,7 +38,7 @@
           </ion-col>
         </ion-row>
         <template v-else>
-          <load-more
+          <BaseLoadMore
             v-if="fristLoaded && !isInfiniteDisabled"
             :loading="loading"
             :frist-loaded="fristLoaded"
@@ -46,7 +46,7 @@
             :label="t('base.loadMore')"
             @on-next-page="loadNextPage"
           >
-          </load-more>
+          </BaseLoadMore>
         </template>
       </template>
     </ion-content>
@@ -54,12 +54,12 @@
 </template>
 <script setup lang="ts">
 import PermissionService from '@/api/PermissionService';
-import { Permission } from '@/types/Models';
-import { useLang } from '@/composables/UseLang';
-import { usePaging } from '@/composables/UsePaging';
-import { useSort } from '@/composables/UseSort';
-import BaseToolbar from '@/components/base/Toolbar.vue';
-import BaseBackButton from '@/components/base/BackButton.vue';
+import type { Permission } from '@/types/models';
+import { useLang } from '@/composables/useLang';
+import { usePaging } from '@/composables/usePaging';
+import { useSort } from '@/composables/useSort';
+import BaseToolbar from '@/components/base/BaseToolbar.vue';
+import BaseBackButton from '@/components/base/BaseBackButton.vue';
 import {
   IonPage,
   IonRow,
@@ -115,15 +115,9 @@ import {
   IonTabButton,
 } from '@ionic/vue';
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
-const BaseResult = defineAsyncComponent(
-  () => import('@/components/base/Result.vue'),
-);
-const LoadMore = defineAsyncComponent(
-  () => import('@/components/LoadMore.vue'),
-);
-const BaseSpinner = defineAsyncComponent(
-  () => import('@/components/base/Spinner.vue'),
-);
+const BaseResult = defineAsyncComponent(() => import('@/components/base/BaseResult.vue'));
+const BaseLoadMore = defineAsyncComponent(() => import('@/components/base/BaseLoadMore.vue'));
+const BaseSpinner = defineAsyncComponent(() => import('@/components/base/BaseSpinner.vue'));
 const { t } = useLang();
 const { pages, resetPaging } = usePaging(5);
 const { sort, sortMode } = useSort({

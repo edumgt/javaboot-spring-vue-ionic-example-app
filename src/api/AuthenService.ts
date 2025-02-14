@@ -1,17 +1,17 @@
-import {
+import type {
   LoginRequest,
   RefreshTokenRequest,
   RefreshTokenResponse
-} from '@/types/Models';
-import { AppException, ForgotPasswordRequest, ResponseMessage } from '@/types/Common';
-import { useAxios } from '@/composables/UseAxios';
-import { AxiosResponse } from "axios";
+} from '@/types/models';
+import type { AppException, ForgotPasswordRequest, ResponseMessage } from '@/types/common';
+import { useAxios } from '@/composables/useAxios';
+import type { AxiosResponse } from 'axios';
 export default () => {
   const { callAxios, callAxiosProcess } = useAxios();
 
   const singin = async (
     loginRequest: LoginRequest
-  ): Promise<RefreshTokenResponse> => {
+  ): Promise<RefreshTokenResponse | null> => {
     return await callAxios<RefreshTokenResponse>({
       API: '/api/auth/login',
       method: 'POST',
@@ -21,7 +21,7 @@ export default () => {
 
   const singoutToServer = async (
     refreshToken: RefreshTokenRequest
-  ): Promise<ResponseMessage> => {
+  ): Promise<ResponseMessage | null> => {
     return await callAxios<ResponseMessage>({
       API: '/api/auth/logout',
       method: 'POST',
@@ -30,7 +30,7 @@ export default () => {
   };
   const refreshToken = async (
     refreshToken: RefreshTokenRequest
-  ): Promise<RefreshTokenResponse> => {
+  ): Promise<RefreshTokenResponse | null> => {
     return await callAxios<RefreshTokenResponse>({
       API: '/api/auth/refreshToken',
       method: 'POST',
@@ -39,13 +39,13 @@ export default () => {
   };
   const removeAccessTokenSession = async (
     id: number
-  ): Promise<ResponseMessage> => {
+  ): Promise<ResponseMessage | null> => {
     return await callAxios<ResponseMessage>({
       API: `/api/auth/removeAccessTokenSession?id=${id}`,
       method: 'DELETE'
     });
   };
-  //Forgot password
+  // Forgot password
   const requestVerifyCodeToResetPwd = async (
     req: ForgotPasswordRequest
   ): Promise<AxiosResponse<ResponseMessage | AppException>> => {

@@ -1,17 +1,16 @@
 <template>
   <ion-app>
-    <ion-router-outlet />
+    <ion-router-outlet :aria-hidden="true" />
   </ion-app>
 </template>
 
 <script setup lang="ts">
-import { useBase } from '@/composables/UseBase';
-import { useConfig } from '@/composables/UseConfig';
-import { useInitAuthen } from '@/composables/UseInitAuthen';
-import { useLang } from '@/composables/UseLang';
-import { useAuthenStore } from '@/stores/AuthenStore';
-import { useDeviceStore } from '@/stores/DeviceStore';
-import { AppSetup } from '@/utils/App';
+import { useBase } from '@/composables/useBase';
+import { useConfig } from '@/composables/useConfig';
+import { useInitApp } from '@/composables/useInitApp';
+import { useLang } from '@/composables/useLang';
+import { useAuthenStore } from '@/stores/authenStore';
+import { useDeviceStore } from '@/stores/deviceStore';
 import { App } from '@capacitor/app';
 import {
   IonApp,
@@ -19,50 +18,36 @@ import {
   useBackButton,
   useIonRouter
 } from '@ionic/vue';
-import { onBeforeMount, onBeforeUnmount, watch } from 'vue';
+import { onBeforeMount } from 'vue';
 
 const { isDevMode } = useConfig();
 const authenStore = useAuthenStore();
-const { initAuth } = useInitAuthen();
+const { initAuthen, initThemeLanguge } = useInitApp();
 const ionRouter = useIonRouter();
-const { getCurrentPath, WeeConfirm, WeeGoTo } = useBase();
+const { getCurrentPath, appConfirm } = useBase();
 const { t } = useLang();
 const deviceStore = useDeviceStore();
 const { setAppStateChange } = deviceStore;
 onBeforeMount(async () => {
+  initThemeLanguge();
   console.log('App.vue > onBeforeMount');
-  AppSetup();
   if (isDevMode()) {
     console.log('App.vue >onBeforeMount > authenStore ', authenStore.auth);
   }
   App.addListener('appStateChange', async ({ isActive }) => {
-    // if (isActive) {
-    //   await authenStore.stopAndRestartRefreshTokenTimer();
-    // }
     setAppStateChange(isActive);
   });
 
-  await initAuth();
+  await initAuthen();
 
   useBackButton(-1, async () => {
     const currentPath = getCurrentPath();
     if (!ionRouter.canGoBack() || currentPath == '/tabs/home') {
-      const confirm = await WeeConfirm(t('app.monogram'), t('base.appExit'));
+      const confirm = await appConfirm(t('app.monogram'), t('base.appExit'));
       if (confirm) {
         App.exitApp();
       }
     }
   });
-});
-
-onBeforeUnmount(() => {
-  if (authenStore && authenStore.refreshTokenTimeout) {
-    authenStore.stopRefreshTokenTimer();
-  }
-});
-watch(authenStore, (state) => {
-  if (state && state.sessionExpired) {
-    WeeGoTo('/auth/login', true);
-  }
 });
 </script>

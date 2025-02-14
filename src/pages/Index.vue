@@ -38,14 +38,13 @@
   </ion-page>
 </template>
 <script setup lang="ts">
-declare let window: any;
-import { useAuthenStore } from '@/stores/AuthenStore';
+import { useAuthenStore } from '@/stores/authenStore';
 import { defineAsyncComponent, onMounted, ref } from 'vue';
-import { useInitAuthen } from '@/composables/UseInitAuthen';
-import { useAuthen } from '@/composables/UseAuthen';
-import { useBase } from '@/composables/UseBase';
-import { useConfig } from '@/composables/UseConfig';
-import { useCheckVersion } from '@/composables/UseCheckVersion';
+import { useInitApp } from '@/composables/useInitApp';
+import { useAuthen } from '@/composables/useAuthen';
+import { useBase } from '@/composables/useBase';
+import { useConfig } from '@/composables/useConfig';
+import { useCheckVersion } from '@/composables/useCheckVersion';
 import {
   IonRow,
   IonCol,
@@ -54,21 +53,22 @@ import {
   IonSpinner,
   IonPage,
 } from '@ionic/vue';
-import { useLang } from '@/composables/UseLang';
+import { useLang } from '@/composables/useLang';
+declare let window: any;
 
 const VersionCheck = defineAsyncComponent(
   () => import('@/components/VersionCheck.vue'),
 );
 const BaseResult = defineAsyncComponent(
-  () => import('@/components/base/Result.vue'),
+  () => import('@/components/base/BaseResult.vue'),
 );
 const { t } = useLang();
-const { initAuth } = useInitAuthen();
+const { initAuthen } = useInitApp();
 const { destroyAuthDataAndRedirect } = useAuthen();
-const { WeeGoTo } = useBase();
+const { appNavigateTo } = useBase();
 const { isDevMode } = useConfig();
-const { checkVersion, appVersion, platForm, haveVersionUpdate, userVersion } =
-  useCheckVersion();
+const { checkVersion, appVersion, platForm, haveVersionUpdate, userVersion }
+  = useCheckVersion();
 const authenStore = useAuthenStore();
 const loading = ref(true);
 const isDeviceRooted = ref(false);
@@ -115,18 +115,18 @@ const checkAuth = async () => {
   let auth = authenStore.auth;
 
   if (!auth) {
-    const initItem = await initAuth();
+    const initItem = await initAuthen();
     if (initItem) {
       auth = initItem;
     }
   }
 
   if (auth) {
-    WeeGoTo('/tabs/home', true);
+    appNavigateTo('/tabs/home', true);
   } else {
-    WeeGoTo('/auth/login', true);
+    appNavigateTo('/auth/login', true);
     // destroyAuthDataAndRedirect(false);
-    // WeeGoTo('/auth/login', true);
+    // appNavigateTo('/auth/login', true);
   }
   return new Promise((resolve) => {
     resolve(true);
